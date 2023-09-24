@@ -123,3 +123,224 @@ System.InvalidOperationException: Unable to resolve service for type 'backend.Se
    at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
    at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
    at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+
+
+....................................
+using backend.Models;
+using backend.Models.Response;
+using backend.Repository;
+using backend.Repository.Interfaces;
+using Microsoft.EntityFrameworkCore;
+using Moq;
+using NUnit.Framework;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace TestbackendAPIs.Repository
+{
+    public class TestEmployeeRepo
+    {
+        private Mock<LoansContext> _mockDb;
+        private IEmployeeRepo _employeeRepo;
+        private Mock<DbSet<EmployeeMaster>> _mockDbSet;
+        private IQueryable<EmployeeMaster> employeeData;
+
+        [SetUp]
+        public void Setup()
+        {
+            _mockDb = new Mock<LoansContext>();
+            _mockDbSet = new Mock<DbSet<EmployeeMaster>>();
+            employeeData = new List<EmployeeMaster>() {
+            new EmployeeMaster
+            {
+                EmployeeId = "EMP-1234",
+                PasswordHash = "1234",
+                Salt = "123",
+                EmployeeName = "Test",
+                Designation = "admin",
+                Department = "IT",
+                Gender = "F",
+                DateOfBirth = DateTime.Now.Date,
+                DateOfJoining = DateTime.Now.Date
+            },
+
+            new EmployeeMaster
+            {
+                EmployeeId = "EMP-1235",
+                PasswordHash = "1234",
+                Salt = "123",
+                EmployeeName = "Test1",
+                Designation = "employee",
+                Department = "IT",
+                Gender = "F",
+                DateOfBirth = DateTime.Now.Date,
+                DateOfJoining = DateTime.Now.Date
+            }
+            }.AsQueryable();
+
+            _mockDbSet.As<IQueryable<EmployeeMaster>>().Setup(m => m.Provider).Returns(employeeData.Provider);
+            _mockDbSet.As<IQueryable<EmployeeMaster>>().Setup(m => m.Expression).Returns(employeeData.Expression);
+            _mockDbSet.As<IQueryable<EmployeeMaster>>().Setup(m => m.ElementType).Returns(employeeData.ElementType);
+            _mockDbSet.As<IQueryable<EmployeeMaster>>().Setup(m => m.GetEnumerator()).Returns(employeeData.GetEnumerator());
+
+            _mockDb.Setup(m => m.EmployeeMasters).Returns(_mockDbSet.Object);
+
+            _employeeRepo = new EmployeeRepo(_mockDb.Object);
+        }
+
+        [Test]
+        public void TestAddEmployee()
+        {
+            var addEmployee = new EmployeeMaster
+            {
+                EmployeeId = "EMP-1234",
+                PasswordHash = "1234",
+                Salt = "123",
+                EmployeeName = "Test",
+                Designation = "admin",
+                Department = "IT",
+                Gender = "F",
+                DateOfBirth = DateTime.Now.Date,
+                DateOfJoining = DateTime.Now.Date
+            };
+            var result = _employeeRepo.AddEmployee(addEmployee);
+
+            Assert.IsTrue(result);
+            
+        }
+        [Test]
+        public void TestGetAllEmployees()
+        {
+            var result = _employeeRepo.GetAllEmployees();
+
+            Assert.IsNotNull(result);
+            Assert.IsInstanceOf<List<EmployeeResponse>>(result);
+            Assert.AreEqual(2, result.Count);
+        }
+    }
+}
+
+..............
+using backend.Models;
+using backend.Models.Response;
+using backend.Models.Request;
+using backend.Repository.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+using backend.Services;
+using System.Security.Cryptography;
+
+namespace backend.Repository
+{
+    public class EmployeeRepo : IEmployeeRepo
+    {
+        private readonly LoansContext _db;
+
+        public EmployeeRepo(LoansContext db)
+        {
+            _db = db;
+        }
+
+        public bool AddEmployee(EmployeeMaster employee)
+        {
+            try
+            {
+                _db.Set<EmployeeMaster>().Add(employee);
+                _db.SaveChanges();
+                //_db.EmployeeMasters.Add(employee);
+                // _db.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return false;
+            }
+        }
+
+        public List<EmployeeResponse> GetAllEmployees()
+        {
+            var response = _db.EmployeeMasters
+                .Select(employee => new EmployeeResponse
+                {
+                    EmployeeId = employee.EmployeeId,
+                    EmployeeName = employee.EmployeeName,
+                    Designation = employee.Designation,
+                    Department = employee.Department,
+                    Gender = employee.Gender,
+                    DateOfBirth = employee.DateOfBirth,
+                    DateOfJoining = employee.DateOfJoining
+                })
+                .ToList();
+            return response;
+        }
+
+        public EmployeeMaster? GetEmployeeById(string employeeId)
+        {
+            var employee = _db.EmployeeMasters.FirstOrDefault(employee => employee.EmployeeId == employeeId);
+            return employee;
+        }
+
+        public bool UpdateEmployee(UpdateEmployeeRequest employee)
+        {
+            var existingEmployee = _db.EmployeeMasters.FirstOrDefault(empl => empl.EmployeeId == employee.EmployeeId);
+            Console.WriteLine("employee is " + employee);
+            if (existingEmployee != null) 
+            {
+                existingEmployee.EmployeeName = employee.EmployeeName ?? existingEmployee.EmployeeName;
+                existingEmployee.Designation = employee.Designation ?? existingEmployee.Designation;
+                existingEmployee.Department = employee.Department ?? existingEmployee.Department;
+                existingEmployee.Gender = employee.Gender ?? existingEmployee.Gender;
+                existingEmployee.DateOfBirth = employee.DateOfBirth ?? existingEmployee.DateOfBirth;
+                existingEmployee.DateOfJoining = employee.DateOfJoining ?? existingEmployee.DateOfJoining;
+
+                /*
+                 * Functionality for admin only
+                 * if (employee.Password!=null)
+                {
+                    (existingEmployee.PasswordHash, existingEmployee.Salt) = PasswordHelper.HashPassword(employee.Password);
+                }*/
+                try
+                {
+                    _db.Entry(existingEmployee).State = Microsoft.EntityFrameworkCore.EntityState.Modified;
+                    _db.SaveChangesAsync();
+                    return true;
+                }
+                catch(Exception e)
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        public EmployeeResponse? DeleteEmployee(string employeeId)
+        {
+            EmployeeMaster? employee =  _db.EmployeeMasters.Find(employeeId);
+            if (employee == null)
+            {
+                return null;
+            }
+            else
+            {
+                _db.EmployeeMasters.Remove(employee);
+                _db.SaveChanges();
+                var deletedEmployee = new EmployeeResponse
+                {
+                    EmployeeId = employee.EmployeeId,
+                    EmployeeName = employee.EmployeeName,
+                    Designation = employee.Designation,
+                    Department = employee.Department,
+                    Gender = employee.Gender,
+                    DateOfBirth = employee.DateOfBirth,
+                    DateOfJoining = employee.DateOfJoining
+                };
+                return deletedEmployee;
+            }
+        }
+    }
+}
+
