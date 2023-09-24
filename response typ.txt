@@ -1,0 +1,32 @@
+[
+  {
+    "itemId": "item-1234",
+    "itemDescription": "sofa",
+    "issueStatus": "Y",
+    "itemMake": "cushion",
+    "itemCategory": "string",
+    "itemValuation": 5000,
+    "requestId": "REQ-4a646",
+    "employeeId": "EMP-68d75",
+    "requestDate": "2023-09-24T00:00:00",
+    "requestStatus": "Pending Approval",
+    "returnDate": null,
+    "loanId": "loan-1234",
+    "durationInYears": 9
+  },
+    {
+    "itemId": "item-12345,
+    "itemDescription": "chair",
+    "issueStatus": "Y",
+    "itemMake": "wood",
+    "itemCategory": "string",
+    "itemValuation": 5000,
+    "requestId": "REQ-4a642",
+    "employeeId": "EMP-68d75",
+    "requestDate": "2023-09-24T00:00:00",
+    "requestStatus": "Pending Approval",
+    "returnDate": null,
+    "loanId": "loan-1234",
+    "durationInYears": 9
+  }
+]
